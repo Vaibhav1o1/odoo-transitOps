@@ -17,7 +17,7 @@ TransitOps is a lightweight, real-time fleet management and logistics ERP system
 
 ## 📁 Project Directory Structure
 
-The project is structured with a root-level backend environment and a dedicated subdirectory for the React frontend application:
+The project is structured with a root-level backend environment and a dedicated subdirectory for the React frontend application:-
 
 ```text
 odoo-transitOps/                  (Repository Root - Backend)
