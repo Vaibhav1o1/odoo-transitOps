@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wrench, Plus, AlertCircle, Play, CheckCircle, Clock } from 'lucide-react';
-import { maintenanceService, vehicleService } from '../services/mockApi';
+import { maintenanceService, vehicleService } from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
 import { Button, Input, Select, Badge, Card } from '../components/CommonUI';
 import { Modal } from '../components/Modal';

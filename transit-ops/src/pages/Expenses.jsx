@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Plus, Search, Calendar, Landmark, Wrench, Fuel } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
-import { expenseService, vehicleService } from '../services/mockApi';
+import { expenseService, vehicleService } from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
 import { Table } from '../components/Table';
 import { Button, Input, Select, Badge, Pagination, Card } from '../components/CommonUI';

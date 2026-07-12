@@ -33,7 +33,7 @@ import {
 } from 'recharts';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
-import { dashboardService, vehicleService, driverService, tripService, maintenanceService, expenseService } from '../services/mockApi';
+import { dashboardService, vehicleService, driverService, tripService, maintenanceService, expenseService } from '../services/api';
 import { StatCard, Card, Skeleton, Button, Badge, Input, Select } from '../components/CommonUI';
 import { Modal, Drawer } from '../components/Modal';
 

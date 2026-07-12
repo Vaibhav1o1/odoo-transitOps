@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, Plus, Search, Edit2, Trash2, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
-import { vehicleService } from '../services/mockApi';
+import { vehicleService } from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
 import { Table } from '../components/Table';
 import { Button, Input, Select, Badge, Pagination } from '../components/CommonUI';
