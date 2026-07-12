@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Wrench, Plus, AlertCircle, Play, CheckCircle, Clock } from 'lucide-react';
 import { maintenanceService, vehicleService } from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
-import { Button, Input, Select, Badge, Card } from '../components/CommonUI';
+import { Button, Input, Select, Badge, Card, Skeleton } from '../components/CommonUI';
 import { Modal } from '../components/Modal';
 
 export default function Maintenance() {
@@ -19,7 +19,7 @@ export default function Maintenance() {
   // Forms
   const [form, setForm] = useState({
     vehicleId: '',
-    issue: '',
+    description: '',
     priority: 'Medium',
     status: 'Open',
   });
@@ -48,7 +48,7 @@ export default function Maintenance() {
   const handleOpenAdd = () => {
     setForm({
       vehicleId: '',
-      issue: '',
+      description: '',
       priority: 'Medium',
       status: 'Open',
     });
@@ -237,13 +237,19 @@ export default function Maintenance() {
             value={form.vehicleId}
             onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}
           />
-          <Input
-            label="Reported Fault / Diagnostic Issue"
-            required
-            placeholder="Engine radiator leak detected, low pressure error"
-            value={form.issue}
-            onChange={(e) => setForm({ ...form, issue: e.target.value })}
-          />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Description of Issue
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              required
+              rows={3}
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-white"
+              placeholder="Describe the maintenance required..."
+            />
+          </div>
           <Select
             label="Criticality Priority"
             options={[

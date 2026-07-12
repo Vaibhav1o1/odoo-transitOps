@@ -1,14 +1,48 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid'); // Required for UUID primary keys
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const db = require('./db/db'); // Ensure this points to your SQLite connection file
+
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecrettransitopskey';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // ==========================================
-// 1. VEHICLE REGISTRY ROUTES
+// 1. AUTHENTICATION ROUTES
+// ==========================================
+app.post('/api/login', (req, res) => {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    db.get('SELECT * FROM users WHERE email = ?', [email], (err, user) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+
+        const isValid = bcrypt.compareSync(password, user.password);
+        if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
+
+        const token = jwt.sign(
+            { id: user.id, email: user.email, role: user.role, name: user.name },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        res.json({
+            token,
+            user: { id: user.id, email: user.email, role: user.role, name: user.name }
+        });
+    });
+});
+
+// ==========================================
+// 2. VEHICLE REGISTRY ROUTES
 // ==========================================
 
 // Get all vehicles (with optional status filter)

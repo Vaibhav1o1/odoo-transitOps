@@ -39,17 +39,19 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const menuItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Vehicles', path: '/vehicles', icon: Truck },
-    { label: 'Drivers', path: '/drivers', icon: Users },
-    { label: 'Trips', path: '/trips', icon: Map },
-    { label: 'Maintenance', path: '/maintenance', icon: Wrench },
-    { label: 'Fuel & Expenses', path: '/expenses', icon: DollarSign },
-    { label: 'Reports', path: '/reports', icon: BarChart3 },
-    { label: 'Settings', path: '/settings', icon: Settings },
-    { label: 'Profile', path: '/profile', icon: User },
+  const allMenuItems = [
+    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['Fleet Manager', 'Safety Officer', 'Financial Analyst', 'Driver'] },
+    { label: 'Vehicles', path: '/vehicles', icon: Truck, roles: ['Fleet Manager', 'Safety Officer'] },
+    { label: 'Drivers', path: '/drivers', icon: Users, roles: ['Fleet Manager', 'Safety Officer'] },
+    { label: 'Trips', path: '/trips', icon: Map, roles: ['Fleet Manager', 'Driver'] },
+    { label: 'Maintenance', path: '/maintenance', icon: Wrench, roles: ['Fleet Manager'] },
+    { label: 'Fuel & Expenses', path: '/expenses', icon: DollarSign, roles: ['Fleet Manager', 'Financial Analyst'] },
+    { label: 'Reports', path: '/reports', icon: BarChart3, roles: ['Fleet Manager', 'Financial Analyst', 'Safety Officer'] },
+    { label: 'Settings', path: '/settings', icon: Settings, roles: ['Fleet Manager'] },
+    { label: 'Profile', path: '/profile', icon: User, roles: ['Fleet Manager', 'Safety Officer', 'Financial Analyst', 'Driver'] },
   ];
+
+  const menuItems = allMenuItems.filter(item => item.roles.includes(user?.role));
 
   const handleLogout = () => {
     logout();

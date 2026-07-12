@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 
@@ -34,9 +35,15 @@ db.serialize(() => {
     // ==========================================
     console.log("Inserting fleet assets and users...");
     
-    // Create an Admin User
+    // Create Users
+    const saltRounds = 10;
+    const defaultPassword = bcrypt.hashSync("admin123", saltRounds);
+
     const adminId = uuidv4();
-    db.run("INSERT INTO users (id, email, role) VALUES (?, ?, ?)", [adminId, "admin@transitops.com", "Fleet Manager"]);
+    db.run("INSERT INTO users (id, email, name, password, role) VALUES (?, ?, ?, ?, ?)", [adminId, "admintransitops@gmail.com", "Alex Mercer", defaultPassword, "Fleet Manager"]);
+
+    const driverId = uuidv4();
+    db.run("INSERT INTO users (id, email, name, password, role) VALUES (?, ?, ?, ?, ?)", [driverId, "driver@transitops.com", "Elena Rostova", defaultPassword, "Driver"]);
 
     const vStmt = db.prepare(`
         INSERT INTO vehicles (id, reg_number, name_model, type, max_capacity_kg, odometer, acquisition_cost, status) 
@@ -77,7 +84,7 @@ db.serialize(() => {
 
     const drivers = [
         [dIds.alex, adminId, "Alex Mercer", "DL-90812", "Class A (Heavy)", "2028-10-15", "+1-555-0101", 98.5, "Available"],
-        [dIds.elena, adminId, "Elena Rostova", "DL-44319", "Class B (Van)", "2027-05-20", "+1-555-0102", 99.0, "On Trip"],
+        [dIds.elena, driverId, "Elena Rostova", "DL-44319", "Class B (Van)", "2027-05-20", "+1-555-0102", 99.0, "On Trip"],
         [dIds.marcus, adminId, "Marcus Vance", "DL-11204", "Class A (Heavy)", "2029-01-11", "+1-555-0103", 94.2, "Available"],
         [dIds.sarah, adminId, "Sarah Jenkins", "DL-88210", "Class B (Van)", "2027-08-30", "+1-555-0104", 96.8, "On Trip"],
         [dIds.david, adminId, "David Kim", "DL-33109", "Class A (Heavy)", "2024-01-01", "+1-555-0105", 88.0, "Available"]

@@ -5,6 +5,8 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY, -- UUID
     email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    password TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('Fleet Manager', 'Driver', 'Safety Officer', 'Financial Analyst'))
 );
 
