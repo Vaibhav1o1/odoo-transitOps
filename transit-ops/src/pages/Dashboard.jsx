@@ -49,12 +49,25 @@ const utilizationTrendData = [
 ];
 
 const fuelCostData = [
-  { month: 'Mar', cost: 4200 },
-  { month: 'Apr', cost: 5100 },
-  { month: 'May', cost: 4800 },
-  { month: 'Jun', cost: 6200 },
-  { month: 'Jul', cost: 5800 },
+  { month: 'Mar', cost: 348600 },
+  { month: 'Apr', cost: 423300 },
+  { month: 'May', cost: 398400 },
+  { month: 'Jun', cost: 514600 },
+  { month: 'Jul', cost: 481400 },
 ];
+
+const formatINR = (value) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(value);
+};
+
+// Database values are in USD, so we convert them to INR for realistic presentation
+const formatDbCost = (cost) => {
+  return formatINR(Number(cost || 0) * 83);
+};
 
 const tripCompletionData = [
   { name: 'Mon', completed: 12, target: 15 },
@@ -65,6 +78,45 @@ const tripCompletionData = [
   { name: 'Sat', completed: 8, target: 10 },
   { name: 'Sun', completed: 5, target: 8 },
 ];
+
+const CITY_COORDS = {
+  'Delhi': { x: 145, y: 70, label: 'Delhi (DEL)' },
+  'Mumbai': { x: 95, y: 175, label: 'Mumbai (BOM)' },
+  'Bengaluru': { x: 135, y: 240, label: 'Bengaluru (BLR)' },
+  'Chennai': { x: 165, y: 235, label: 'Chennai (MAA)' },
+  'Kolkata': { x: 250, y: 130, label: 'Kolkata (CCU)' },
+  'Hyderabad': { x: 150, y: 185, label: 'Hyderabad (HYD)' },
+  'Ahmedabad': { x: 85, y: 135, label: 'Ahmedabad (AMD)' },
+  'Pune': { x: 100, y: 190, label: 'Pune (PNQ)' }
+};
+
+const getCoords = (cityName, defaultCity = 'Delhi') => {
+  if (!cityName) return CITY_COORDS[defaultCity];
+  const name = cityName.toLowerCase();
+  for (const key of Object.keys(CITY_COORDS)) {
+    if (name.includes(key.toLowerCase()) || key.toLowerCase().includes(name)) {
+      return CITY_COORDS[key];
+    }
+  }
+  // Fallbacks for seed data
+  if (name.includes('warehouse a')) return CITY_COORDS['Delhi'];
+  if (name.includes('distribution center b')) return CITY_COORDS['Mumbai'];
+  if (name.includes('port terminal 4')) return CITY_COORDS['Chennai'];
+  if (name.includes('factory gate 1')) return CITY_COORDS['Hyderabad'];
+  
+  // Hash fallback
+  const sum = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const keys = Object.keys(CITY_COORDS);
+  return CITY_COORDS[keys[sum % keys.length]];
+};
+
+const getProgress = (vehicleId) => {
+  const hash = vehicleId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const durationMs = 40000; // 40 seconds cycle
+  const now = Date.now();
+  const progress = ((now + hash * 1000) % durationMs) / durationMs;
+  return progress;
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -78,6 +130,16 @@ export default function Dashboard() {
   const [recentTrips, setRecentTrips] = useState([]);
   const [recentMaintenance, setRecentMaintenance] = useState([]);
   const [recentExpenses, setRecentExpenses] = useState([]);
+
+  // Live Map Tracker State
+  const [allVehicles, setAllVehicles] = useState([]);
+  const [allTrips, setAllTrips] = useState([]);
+  const [mapTab, setMapTab] = useState('map'); // 'map' or 'chart'
+  const [selectedMapVehicle, setSelectedMapVehicle] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [simTime, setSimTime] = useState(Date.now());
+  const [yearwiseExpenses, setYearwiseExpenses] = useState({});
+  const [expandedYear, setExpandedYear] = useState(null);
 
   // Modals state
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
@@ -95,6 +157,15 @@ export default function Dashboard() {
   const [vehiclesList, setVehiclesList] = useState([]);
   const [driversList, setDriversList] = useState([]);
 
+  // Map simulation timer
+  useEffect(() => {
+    if (mapTab !== 'map') return;
+    const interval = setInterval(() => {
+      setSimTime(Date.now());
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [mapTab]);
+
   const loadDashboardData = async () => {
     setLoading(true);
     try {
@@ -103,6 +174,7 @@ export default function Dashboard() {
 
       const tripsRes = await tripService.getAll();
       setRecentTrips(tripsRes.slice(0, 3));
+      setAllTrips(tripsRes);
 
       const maintRes = await maintenanceService.getAll();
       setRecentMaintenance(maintRes.slice(0, 3));
@@ -110,8 +182,52 @@ export default function Dashboard() {
       const expRes = await expenseService.getAll();
       setRecentExpenses(expRes.slice(0, 3));
 
+      // Calculate yearwise expenses
+      const grouped = {};
+      const combinedExpenses = [
+        ...expRes.map(e => ({
+          id: e.id,
+          type: 'Fuel',
+          description: e.description || `Fuel logged for Vehicle ${e.vehicleId}`,
+          cost: e.cost,
+          date: e.date,
+          vehicleId: e.vehicleId
+        })),
+        ...maintRes.map(m => ({
+          id: m.id,
+          type: 'Maintenance',
+          description: m.description || `Repair: Vehicle ${m.vehicleId}`,
+          cost: m.cost,
+          date: m.assignedDate || m.date,
+          vehicleId: m.vehicleId
+        }))
+      ];
+
+      combinedExpenses.forEach(item => {
+        const year = item.date ? new Date(item.date).getFullYear() : 2026;
+        if (!grouped[year]) {
+          grouped[year] = {
+            total: 0,
+            items: []
+          };
+        }
+        grouped[year].items.push(item);
+        grouped[year].total += Number(item.cost || 0);
+      });
+
+      Object.keys(grouped).forEach(year => {
+        grouped[year].items.sort((a, b) => new Date(b.date) - new Date(a.date));
+      });
+
+      setYearwiseExpenses(grouped);
+      const years = Object.keys(grouped).sort((a, b) => b - a);
+      if (years.length > 0) {
+        setExpandedYear(Number(years[0]));
+      }
+
       // Get vehicles & drivers for dropdown selections
       const vList = await vehicleService.getAll();
+      setAllVehicles(vList);
       setVehiclesList(vList.filter(v => v.status === 'Available'));
       const dList = await driverService.getAll();
       setDriversList(dList.filter(d => d.status === 'Available'));
@@ -178,7 +294,7 @@ export default function Dashboard() {
       await expenseService.create({
         vehicleId: newFuel.vehicleId,
         expenseType: 'Fuel',
-        cost: Number(newFuel.cost),
+        cost: Number(newFuel.cost) / 83,
         date: newFuel.date,
         description: `Fuel logged at ${newFuel.odometer} km`
       });
@@ -191,7 +307,7 @@ export default function Dashboard() {
         });
       }
 
-      addNotification('Fuel Logged', `Logged fuel expense of $${newFuel.cost} for vehicle.`, 'success');
+      addNotification('Fuel Logged', `Logged fuel expense of ₹${Number(newFuel.cost).toLocaleString('en-IN')} for vehicle.`, 'success');
       setFuelModalOpen(false);
       setNewFuel({ vehicleId: '', cost: '', odometer: '', date: new Date().toISOString().split('T')[0] });
       loadDashboardData();
@@ -220,6 +336,67 @@ export default function Dashboard() {
     { name: 'On Trip', value: stats.activeVehicles - stats.availableVehicles - stats.maintenanceVehicles, color: '#2563EB' },
     { name: 'In Shop', value: stats.maintenanceVehicles, color: '#EF4444' },
   ].filter(i => i.value > 0) : [];
+
+  // Live Map calculations
+  const mapVehicles = (allVehicles.length > 0 ? allVehicles : [
+    { id: 'v1', registrationNumber: 'DL-01-GB-4202', name: 'Tata Prima', type: 'Semi-Truck', status: 'On Trip' },
+    { id: 'v2', registrationNumber: 'MH-12-PQ-8819', name: 'Mahindra Blazo', type: 'Heavy Duty Truck', status: 'On Trip' },
+    { id: 'v3', registrationNumber: 'KA-03-HA-3312', name: 'Ashok Leyland Ecomet', type: 'Box Truck', status: 'Available' },
+    { id: 'v4', registrationNumber: 'TS-09-XY-9092', name: 'BharatBenz 2823C', type: 'Dump Truck', status: 'In Shop' },
+    { id: 'v5', registrationNumber: 'WB-02-TR-4567', name: 'Tata LPT 1613', type: 'Box Truck', status: 'Available' },
+    { id: 'v6', registrationNumber: 'DL-02-CD-7890', name: 'Eicher Pro 2049', type: 'Cargo Van', status: 'In Shop' }
+  ]).map(v => {
+    const activeTrip = allTrips.find(t => t.vehicleId === v.id && t.status === 'Dispatched');
+    let route = activeTrip ? `${activeTrip.source} ➔ ${activeTrip.destination}` : null;
+    let driverName = 'No Driver Assigned';
+    if (activeTrip) {
+      const drv = driversList.find(d => d.id === activeTrip.driverId);
+      driverName = drv ? drv.name : 'Amit Sharma';
+    } else if (v.status === 'On Trip') {
+      route = v.id === 'v1' ? 'Delhi ➔ Mumbai' : 'Mumbai ➔ Bengaluru';
+      driverName = v.id === 'v1' ? 'Amit Sharma' : 'Rajesh Patil';
+    }
+    return {
+      ...v,
+      route,
+      driverName,
+      hub: v.hub || (v.status === 'Available' ? `${v.region || 'North'} Terminal` : null),
+      facility: v.facility || (v.status === 'In Shop' ? 'Fleet Maintenance Yard' : null)
+    };
+  });
+
+  const renderedVehicles = mapVehicles.map(vehicle => {
+    let x = 0, y = 0;
+    let progress = 0;
+    if (vehicle.status === 'On Trip' && vehicle.route) {
+      const parts = vehicle.route.split('➔');
+      const src = parts[0]?.trim();
+      const dest = parts[1]?.trim();
+      const p1 = getCoords(src);
+      const p2 = getCoords(dest);
+      progress = getProgress(vehicle.id);
+      
+      const timeFactor = simTime / 500;
+      const wiggleX = Math.sin(timeFactor + vehicle.registrationNumber.charCodeAt(0)) * 0.5;
+      const wiggleY = Math.cos(timeFactor + vehicle.registrationNumber.charCodeAt(1 || 0)) * 0.5;
+      
+      x = p1.x + (p2.x - p1.x) * progress + wiggleX;
+      y = p1.y + (p2.y - p1.y) * progress + wiggleY;
+    } else if (vehicle.status === 'In Shop') {
+      const repairCities = ['Pune', 'Ahmedabad', 'Hyderabad'];
+      const hashIdx = vehicle.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % repairCities.length;
+      const pt = CITY_COORDS[repairCities[hashIdx]];
+      x = pt.x - 5 + (hashIdx * 3);
+      y = pt.y + 7 - (hashIdx * 2);
+    } else {
+      const hubCities = ['Delhi', 'Mumbai', 'Bengaluru', 'Kolkata'];
+      const hashIdx = vehicle.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % hubCities.length;
+      const pt = CITY_COORDS[hubCities[hashIdx]];
+      x = pt.x + 5 - (hashIdx * 2);
+      y = pt.y - 7 + (hashIdx * 3);
+    }
+    return { ...vehicle, x, y, progress };
+  });
 
   return (
     <div className="space-y-6 text-left">
@@ -280,9 +457,14 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Fleet Utilization Area Chart */}
         <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-850 dark:text-slate-200">Fleet Utilization % Trend</h3>
-            <Badge variant="info">Monthly Overview</Badge>
+          <div className="flex flex-col mb-4 text-left">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-850 dark:text-slate-200">Fleet Utilization Trend (% of Active Fleet)</h3>
+              <Badge variant="info">Monthly Overview</Badge>
+            </div>
+            <p className="text-xs text-slate-450 dark:text-slate-400 mt-1">
+              Percentage of total vehicles actively dispatched on trips vs. idle or in-shop.
+            </p>
           </div>
           <div className="h-64 w-full text-xs">
             <ResponsiveContainer width="100%" height="100%">
@@ -295,8 +477,8 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
                 <XAxis dataKey="name" stroke="#94A3B8" />
-                <YAxis stroke="#94A3B8" />
-                <Tooltip />
+                <YAxis stroke="#94A3B8" tickFormatter={(val) => `${val}%`} />
+                <Tooltip formatter={(value) => [`${value}% Utilization`, 'Active Rate']} />
                 <Area type="monotone" dataKey="rate" stroke="#2563EB" strokeWidth={2} fillOpacity={1} fill="url(#colorRate)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -306,7 +488,7 @@ export default function Dashboard() {
         {/* Fuel Costs Bar Chart */}
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-855 dark:text-slate-200">Monthly Fuel Costs ($)</h3>
+            <h3 className="text-sm font-bold text-slate-855 dark:text-slate-200">Monthly Fuel Costs (₹)</h3>
             <Badge variant="warning">Fleet Expenses</Badge>
           </div>
           <div className="h-64 w-full text-xs">
@@ -314,57 +496,258 @@ export default function Dashboard() {
               <BarChart data={fuelCostData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
                 <XAxis dataKey="month" stroke="#94A3B8" />
-                <YAxis stroke="#94A3B8" />
-                <Tooltip />
+                <YAxis stroke="#94A3B8" tickFormatter={(val) => '₹' + (val / 1000) + 'k'} />
+                <Tooltip formatter={(value) => [formatINR(value), 'Cost']} />
                 <Bar dataKey="cost" fill="#14B8A6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Card>
 
-        {/* Vehicle Status Pie/Donut Chart */}
+        {/* Vehicle Tracking & Status Card */}
         <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-850 dark:text-slate-200">Vehicle Status Distribution</h3>
-            <Badge variant="secondary">Live Status</Badge>
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-850 dark:text-slate-200">Vehicle Tracking & Status</h3>
+              <p className="text-[10px] text-slate-450 dark:text-slate-400 mt-0.5">Real-time coordinates & operational status</p>
+            </div>
+            <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setMapTab('map')}
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                  mapTab === 'map' ? 'bg-white dark:bg-slate-800 text-blue-650 dark:text-blue-400 shadow-xs' : 'text-slate-500 hover:text-slate-850 dark:hover:text-slate-200'
+                }`}
+              >
+                Live Map
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapTab('chart')}
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                  mapTab === 'chart' ? 'bg-white dark:bg-slate-800 text-blue-650 dark:text-blue-400 shadow-xs' : 'text-slate-500 hover:text-slate-850 dark:hover:text-slate-200'
+                }`}
+              >
+                Distribution
+              </button>
+            </div>
           </div>
-          <div className="h-64 flex flex-col md:flex-row items-center justify-center text-xs">
-            {loading ? <Skeleton variant="circle" className="w-40 h-40" /> : (
-              statusDistribution.length === 0 ? (
-                <div className="text-slate-500">No vehicle status data available</div>
-              ) : (
-                <>
-                  <div className="w-1/2 h-full min-h-[160px] relative">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={statusDistribution}
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {statusDistribution.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+
+          {mapTab === 'map' ? (
+            <div className="relative w-full h-64">
+              {/* Search Box Overlay */}
+              <div className="absolute top-2 left-2 z-10 w-40 bg-slate-900/90 backdrop-blur-md p-1 rounded-md border border-slate-800 shadow-md">
+                <input
+                  type="text"
+                  placeholder="Search vehicle reg..."
+                  value={searchQuery}
+                  onChange={e => {
+                    setSearchQuery(e.target.value);
+                    const found = renderedVehicles.find(v => v.registrationNumber.toLowerCase().includes(e.target.value.toLowerCase()));
+                    if (found && e.target.value) {
+                      setSelectedMapVehicle(found);
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+
+              {/* Map SVG Canvas */}
+              <svg viewBox="0 0 320 256" className="w-full h-full bg-slate-950 rounded-xl border border-slate-800 relative overflow-hidden select-none">
+                <style>{`
+                  @keyframes dash {
+                    to {
+                      stroke-dashoffset: -20;
+                    }
+                  }
+                  .route-path {
+                    stroke: rgba(71, 85, 105, 0.25);
+                    stroke-width: 1.5;
+                    fill: none;
+                  }
+                  .route-active-line {
+                    stroke: #0ea5e9;
+                    stroke-width: 1.5;
+                    stroke-dasharray: 4, 6;
+                    animation: dash 6s linear infinite;
+                    fill: none;
+                    opacity: 0.65;
+                  }
+                  .city-dot {
+                    fill: #334155;
+                    stroke: #0f172a;
+                    stroke-width: 1;
+                  }
+                  .city-label {
+                    font-size: 6.5px;
+                    font-weight: 700;
+                    fill: #64748b;
+                  }
+                  .pulse-ring {
+                    animation: map-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+                  }
+                  @keyframes map-pulse {
+                    0%, 100% { transform: scale(1); opacity: 0.75; }
+                    50% { transform: scale(1.6); opacity: 0; }
+                  }
+                `}</style>
+                
+                {/* Background Grid Gridlines */}
+                <defs>
+                  <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
+                    <path d="M 16 0 L 0 0 0 16" fill="none" stroke="#090d16" strokeWidth="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+
+                {/* Shipping Corridors */}
+                <path d="M 145 70 L 85 135 L 95 175" className="route-path" />
+                <path d="M 95 175 L 100 190 L 135 240" className="route-path" />
+                <path d="M 135 240 L 165 235" className="route-path" />
+                <path d="M 150 185 L 165 235" className="route-path" />
+                <path d="M 95 175 L 150 185" className="route-path" />
+                <path d="M 145 70 L 250 130" className="route-path" />
+                <path d="M 250 130 L 165 235" className="route-path" />
+
+                {/* Active Dispatches Paths */}
+                {renderedVehicles.filter(v => v.status === 'On Trip' && v.route).map(vehicle => {
+                  const parts = vehicle.route.split('➔');
+                  const p1 = getCoords(parts[0]?.trim());
+                  const p2 = getCoords(parts[1]?.trim());
+                  return (
+                    <path key={`line-${vehicle.id}`} d={`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`} className="route-active-line" />
+                  );
+                })}
+
+                {/* City Nodes */}
+                {Object.entries(CITY_COORDS).map(([name, pt]) => (
+                  <g key={name}>
+                    <circle cx={pt.x} cy={pt.y} r="2.5" className="city-dot" />
+                    <text x={pt.x + 4} y={pt.y + 1.5} className="city-label">{name}</text>
+                  </g>
+                ))}
+
+                {/* Vehicle Markers */}
+                {renderedVehicles
+                  .filter(v => !searchQuery || v.registrationNumber.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(v => {
+                    const isSelected = selectedMapVehicle?.id === v.id;
+                    const markerColor = v.status === 'On Trip' ? '#3b82f6' : v.status === 'In Shop' ? '#ef4444' : '#22c55e';
+                    return (
+                      <g
+                        key={v.id}
+                        onClick={() => setSelectedMapVehicle(v)}
+                        className="cursor-pointer"
+                        transform={`translate(${v.x}, ${v.y})`}
+                      >
+                        {v.status === 'On Trip' && (
+                          <circle r="6" fill={markerColor} className="pulse-ring" style={{ transformOrigin: '0px 0px' }} />
+                        )}
+                        {isSelected && (
+                          <circle r="8" fill="none" stroke="#ffffff" strokeWidth="1.2" />
+                        )}
+                        <circle r="3.5" fill={markerColor} stroke="#ffffff" strokeWidth="0.8" />
+                      </g>
+                    );
+                  })}
+              </svg>
+
+              {/* Float Map Overlay Tooltip */}
+              {selectedMapVehicle && (
+                <div className="absolute bottom-2 left-2 right-2 bg-slate-900/95 backdrop-blur-md border border-slate-800 p-2 rounded-lg text-[9px] space-y-1 text-slate-100 shadow-xl z-20">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-1">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="font-bold text-slate-50">{selectedMapVehicle.registrationNumber}</span>
+                      <span className="text-[7.5px] bg-slate-800 text-slate-400 px-1 rounded uppercase tracking-wider">{selectedMapVehicle.type}</span>
+                    </div>
+                    <button onClick={() => setSelectedMapVehicle(null)} className="text-slate-500 hover:text-slate-350 font-bold">✕</button>
                   </div>
-                  <div className="w-1/2 space-y-2 mt-4 md:mt-0 text-left">
-                    {statusDistribution.map((entry, idx) => (
-                      <div key={idx} className="flex items-center space-x-2.5">
-                        <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                        <span className="font-semibold text-slate-750 dark:text-slate-300 capitalize">{entry.name}:</span>
-                        <span className="font-bold text-slate-900 dark:text-slate-50">{entry.value} vehicles</span>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 pt-0.5 text-slate-300">
+                    <div>
+                      <span className="text-slate-500 text-[7px] block uppercase font-extrabold">Status</span>
+                      <span className={`font-bold capitalize flex items-center space-x-1 ${
+                        selectedMapVehicle.status === 'On Trip' ? 'text-blue-400' :
+                        selectedMapVehicle.status === 'In Shop' ? 'text-red-400' : 'text-green-400'
+                      }`}>
+                        <span className={`w-1 h-1 rounded-full ${
+                          selectedMapVehicle.status === 'On Trip' ? 'bg-blue-400' :
+                          selectedMapVehicle.status === 'In Shop' ? 'bg-red-400' : 'bg-green-400'
+                        }`} />
+                        <span>{selectedMapVehicle.status}</span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[7px] block uppercase font-extrabold">Driver</span>
+                      <span className="font-semibold text-slate-200">{selectedMapVehicle.driverName}</span>
+                    </div>
+                    
+                    {selectedMapVehicle.status === 'On Trip' ? (
+                      <>
+                        <div className="col-span-2">
+                          <span className="text-slate-500 text-[7px] block uppercase font-extrabold">Transit Route</span>
+                          <span className="font-bold text-blue-400">{selectedMapVehicle.route}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 text-[7px] block uppercase font-extrabold">Odo Speed / Progress</span>
+                          <span className="font-semibold text-slate-200">
+                            {Math.round(60 + (selectedMapVehicle.id.charCodeAt(0) % 20))} km/h • {Math.round((selectedMapVehicle.progress || 0) * 100)}%
+                          </span>
+                        </div>
+                      </>
+                    ) : selectedMapVehicle.status === 'In Shop' ? (
+                      <div className="col-span-2">
+                        <span className="text-slate-500 text-[7px] block uppercase font-extrabold">Facility Center</span>
+                        <span className="font-semibold text-red-300">{selectedMapVehicle.facility}</span>
                       </div>
-                    ))}
+                    ) : (
+                      <div className="col-span-2">
+                        <span className="text-slate-500 text-[7px] block uppercase font-extrabold">Parked Hub</span>
+                        <span className="font-semibold text-green-300">{selectedMapVehicle.hub}</span>
+                      </div>
+                    )}
                   </div>
-                </>
-              )
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="h-64 flex flex-col md:flex-row items-center justify-center text-xs">
+              {loading ? <Skeleton variant="circle" className="w-40 h-40" /> : (
+                statusDistribution.length === 0 ? (
+                  <div className="text-slate-500">No vehicle status data available</div>
+                ) : (
+                  <>
+                    <div className="w-1/2 h-full min-h-[160px] relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusDistribution}
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {statusDistribution.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="w-1/2 space-y-2 mt-4 md:mt-0 text-left">
+                      {statusDistribution.map((entry, idx) => (
+                        <div key={idx} className="flex items-center space-x-2.5">
+                          <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                          <span className="font-semibold text-slate-750 dark:text-slate-300 capitalize">{entry.name}:</span>
+                          <span className="font-bold text-slate-900 dark:text-slate-50">{entry.value} vehicles</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Trip Completion Line Chart */}
@@ -443,7 +826,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Recent Expenses */}
+        {/* Financial Logs Card with Yearwise Collapsible Accordion */}
         <Card className="xl:col-span-1">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Financial Logs</h3>
@@ -451,20 +834,67 @@ export default function Dashboard() {
               View all <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </button>
           </div>
-          <div className="space-y-4">
-            {loading ? Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} variant="line" />) : (
-              recentExpenses.map((exp) => (
-                <div key={exp.id} className="flex justify-between items-start text-xs border-b border-slate-50 dark:border-slate-850/50 pb-3 last:border-0 last:pb-0">
-                  <div className="space-y-1">
-                    <div className="font-bold text-slate-850 dark:text-slate-100">{exp.description}</div>
-                    <div className="text-slate-450 font-medium">{exp.expenseType} • Vehicle {exp.vehicleId}</div>
-                  </div>
-                  <div className="text-right space-y-1 font-bold text-slate-950 dark:text-slate-50">
-                    ${exp.cost.toFixed(2)}
-                    <div className="text-[10px] font-normal text-slate-400 mt-1">{exp.date}</div>
-                  </div>
-                </div>
-              ))
+          
+          <div className="space-y-3">
+            {loading ? (
+              Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} variant="line" />)
+            ) : Object.keys(yearwiseExpenses).length === 0 ? (
+              <div className="text-xs text-slate-500 text-center py-4">No financial logs recorded</div>
+            ) : (
+              Object.keys(yearwiseExpenses)
+                .sort((a, b) => b - a)
+                .map((yearStr) => {
+                  const year = Number(yearStr);
+                  const data = yearwiseExpenses[year];
+                  const isExpanded = expandedYear === year;
+                  return (
+                    <div key={year} className="border border-slate-100 dark:border-slate-850 rounded-xl overflow-hidden shadow-xs">
+                      {/* Accordion Trigger Header */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedYear(isExpanded ? null : year)}
+                        className="w-full flex justify-between items-center bg-slate-50 dark:bg-slate-950 px-3.5 py-2.5 text-xs text-left cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
+                      >
+                        <span className="font-extrabold text-slate-900 dark:text-slate-55">{year} Operations</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-blue-650 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full text-[10px]">
+                            {formatDbCost(data.total)}
+                          </span>
+                          <span className="text-slate-400 text-[10px]">
+                            {isExpanded ? '▲' : '▼'}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Accordion Detail Body */}
+                      {isExpanded && (
+                        <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-850 max-h-48 overflow-y-auto space-y-2.5 scrollbar-thin">
+                          {data.items.map((item) => (
+                            <div key={item.id} className="flex justify-between items-start text-[10px] border-b border-slate-50 dark:border-slate-850/50 pb-2.5 last:border-0 last:pb-0">
+                              <div className="space-y-0.5 pr-2 max-w-[70%]">
+                                <div className="font-bold text-slate-850 dark:text-slate-100 truncate" title={item.description}>
+                                  {item.description}
+                                </div>
+                                <div className="flex items-center space-x-1.5">
+                                  <Badge variant={item.type === 'Fuel' ? 'info' : 'warning'} className="text-[7.5px] px-1 py-0 leading-none">
+                                    {item.type}
+                                  </Badge>
+                                  <span className="text-[9px] text-slate-450 font-medium">Vehicle {item.vehicleId.slice(0, 8)}...</span>
+                                </div>
+                              </div>
+                              <div className="text-right space-y-0.5 shrink-0">
+                                <div className="font-bold text-slate-950 dark:text-slate-50">
+                                  {formatDbCost(item.cost)}
+                                </div>
+                                <div className="text-[8px] text-slate-400">{item.date}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
             )}
           </div>
         </Card>
@@ -517,7 +947,7 @@ export default function Dashboard() {
             value={newFuel.vehicleId}
             onChange={e => setNewFuel({...newFuel, vehicleId: e.target.value})}
           />
-          <Input label="Cost of Fuel ($)" type="number" step="0.01" required placeholder="120.00" value={newFuel.cost} onChange={e => setNewFuel({...newFuel, cost: e.target.value})} />
+          <Input label="Cost of Fuel (₹)" type="number" step="1" required placeholder="8000" value={newFuel.cost} onChange={e => setNewFuel({...newFuel, cost: e.target.value})} />
           <Input label="Current Odometer (km)" type="number" required placeholder="148000" value={newFuel.odometer} onChange={e => setNewFuel({...newFuel, odometer: e.target.value})} />
           <Input label="Date of Expense" type="date" required value={newFuel.date} onChange={e => setNewFuel({...newFuel, date: e.target.value})} />
           
