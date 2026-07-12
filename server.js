@@ -44,6 +44,29 @@ app.post('/api/vehicles', (req, res) => {
     });
 });
 
+// Update an existing vehicle
+app.put('/api/vehicles/:id', (req, res) => {
+    const { id } = req.params;
+    const { reg_number, name_model, type, max_capacity_kg, acquisition_cost, odometer, status } = req.body;
+    
+    const sql = `
+        UPDATE vehicles SET reg_number = ?, name_model = ?, type = ?, max_capacity_kg = ?, acquisition_cost = ?, odometer = ?, status = ? WHERE id = ?
+    `;
+    db.run(sql, [reg_number, name_model, type, max_capacity_kg, acquisition_cost, odometer, status, id], function(err) {
+        if (err) return res.status(400).json({ error: err.message });
+        res.json({ message: 'Vehicle updated successfully' });
+    });
+});
+
+// Delete a vehicle
+app.delete('/api/vehicles/:id', (req, res) => {
+    const { id } = req.params;
+    db.run('DELETE FROM vehicles WHERE id = ?', [id], function(err) {
+        if (err) return res.status(400).json({ error: err.message });
+        res.json({ message: 'Vehicle deleted successfully' });
+    });
+});
+
 // ==========================================
 // 2. DRIVER MANAGEMENT ROUTES
 // ==========================================
@@ -78,9 +101,31 @@ app.post('/api/drivers', (req, res) => {
     });
 });
 
+// Update a driver
+app.put('/api/drivers/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, license_number, license_category, license_expiry_date, contact_number, safety_score, status } = req.body;
+    
+    const sql = `
+        UPDATE drivers SET name = ?, license_number = ?, license_category = ?, license_expiry_date = ?, contact_number = ?, safety_score = ?, status = ? WHERE id = ?
+    `;
+    db.run(sql, [name, license_number, license_category, license_expiry_date, contact_number, safety_score, status, id], function(err) {
+        if (err) return res.status(400).json({ error: err.message });
+        res.json({ message: 'Driver updated successfully' });
+    });
+});
+
 // ==========================================
 // 3. TRIP LIFECYCLE & DISPATCH MANAGEMENT
 // ==========================================
+
+// Get all trips
+app.get('/api/trips', (req, res) => {
+    db.all('SELECT * FROM trips', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
 
 // Create a new Draft Trip
 app.post('/api/trips', (req, res) => {
@@ -151,16 +196,18 @@ app.post('/api/trips/dispatch', (req, res) => {
 app.post('/api/trips/complete', (req, res) => {
     const { trip_id, final_odometer } = req.body;
 
-    db.get('SELECT * FROM trips WHERE id = ?', [trip_id], (err, trip) => {
+    db.get('SELECT * FROM trips t JOIN vehicles v ON t.vehicle_id = v.id WHERE t.id = ?', [trip_id], (err, trip) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!trip || trip.status !== 'Dispatched') {
             return res.status(400).json({ error: 'Trip must be in Dispatched state to complete.' });
         }
 
+        const newOdometer = final_odometer !== undefined ? final_odometer : (trip.odometer + (trip.planned_distance_km || 0));
+
         db.serialize(() => {
             db.run('BEGIN TRANSACTION;');
             db.run("UPDATE trips SET status = 'Completed' WHERE id = ?", [trip_id]);
-            db.run("UPDATE vehicles SET status = 'Available', odometer = ? WHERE id = ?", [final_odometer, trip.vehicle_id]);
+            db.run("UPDATE vehicles SET status = 'Available', odometer = ? WHERE id = ?", [newOdometer, trip.vehicle_id]);
             db.run("UPDATE drivers SET status = 'Available' WHERE id = ?", [trip.driver_id]);
             db.run('COMMIT;', (err) => {
                 if (err) {
@@ -201,6 +248,14 @@ app.post('/api/trips/cancel', (req, res) => {
 // 4. MAINTENANCE & FUEL LOGS
 // ==========================================
 
+// Get all maintenance logs
+app.get('/api/maintenance', (req, res) => {
+    db.all('SELECT * FROM maintenance_logs', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
 // Create Maintenance Log (Auto-switches vehicle to 'In Shop' so it cannot be dispatched)
 app.post('/api/maintenance', (req, res) => {
     const { vehicle_id, description, cost, date } = req.body;
@@ -235,6 +290,33 @@ app.post('/api/maintenance/close', (req, res) => {
     });
 });
 
+// Update Maintenance Log
+app.put('/api/maintenance/:id', (req, res) => {
+    const { id } = req.params;
+    const { status, cost } = req.body;
+    
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
+        db.run("UPDATE maintenance_logs SET status = ?, cost = ? WHERE id = ?", [status, cost, id]);
+        
+        if (status === 'Closed') {
+            db.get('SELECT vehicle_id FROM maintenance_logs WHERE id = ?', [id], (err, row) => {
+                if (row) db.run("UPDATE vehicles SET status = 'Available' WHERE id = ? AND status = 'In Shop'", [row.vehicle_id]);
+            });
+        }
+        
+        db.run('COMMIT;', () => res.json({ message: 'Maintenance updated.' }));
+    });
+});
+
+// Get all fuel logs
+app.get('/api/fuel', (req, res) => {
+    db.all('SELECT * FROM fuel_logs', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
 // Log Fuel Expenses
 app.post('/api/fuel', (req, res) => {
     const { vehicle_id, liters, cost, date } = req.body;
@@ -252,18 +334,44 @@ app.post('/api/fuel', (req, res) => {
 
 // Dashboard KPI Metrics (Active, Available, In Maintenance, and Fleet Utilization %)
 app.get('/api/analytics/kpis', (req, res) => {
-    const sql = `
-        SELECT 
-            COUNT(*) as total_vehicles,
-            SUM(CASE WHEN status = 'Available' THEN 1 ELSE 0 END) as available_vehicles,
-            SUM(CASE WHEN status = 'On Trip' THEN 1 ELSE 0 END) as active_vehicles,
-            SUM(CASE WHEN status = 'In Shop' THEN 1 ELSE 0 END) as maintenance_vehicles,
-            ROUND((SUM(CASE WHEN status = 'On Trip' THEN 1.0 ELSE 0.0 END) / NULLIF(COUNT(*), 0)) * 100, 1) as fleet_utilization_pct
-        FROM vehicles WHERE status != 'Retired'
-    `;
-    db.get(sql, [], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(row || { total_vehicles: 0, available_vehicles: 0, active_vehicles: 0, maintenance_vehicles: 0, fleet_utilization_pct: 0 });
+    db.serialize(() => {
+        const result = {};
+        
+        const vehicleSql = `
+            SELECT 
+                COUNT(*) as total_vehicles,
+                SUM(CASE WHEN status = 'Available' THEN 1 ELSE 0 END) as available_vehicles,
+                SUM(CASE WHEN status = 'On Trip' THEN 1 ELSE 0 END) as active_vehicles,
+                SUM(CASE WHEN status = 'In Shop' THEN 1 ELSE 0 END) as maintenance_vehicles,
+                ROUND((SUM(CASE WHEN status = 'On Trip' THEN 1.0 ELSE 0.0 END) / NULLIF(COUNT(*), 0)) * 100, 1) as fleet_utilization_pct
+            FROM vehicles WHERE status != 'Retired'
+        `;
+        
+        const tripSql = `
+            SELECT 
+                SUM(CASE WHEN status = 'Dispatched' THEN 1 ELSE 0 END) as active_trips,
+                SUM(CASE WHEN status = 'Draft' THEN 1 ELSE 0 END) as pending_trips
+            FROM trips
+        `;
+        
+        const driverSql = `
+            SELECT 
+                SUM(CASE WHEN status IN ('On Trip', 'Available') THEN 1 ELSE 0 END) as drivers_on_duty
+            FROM drivers
+        `;
+
+        db.get(vehicleSql, [], (err, row) => {
+            if (!err && row) Object.assign(result, row);
+            
+            db.get(tripSql, [], (err, row) => {
+                if (!err && row) Object.assign(result, row);
+                
+                db.get(driverSql, [], (err, row) => {
+                    if (!err && row) Object.assign(result, row);
+                    res.json(result);
+                });
+            });
+        });
     });
 });
 
