@@ -80,7 +80,10 @@ export default function Vehicles() {
 
   const handleOpenEdit = (vehicle) => {
     setSelectedVehicle(vehicle);
-    setForm(vehicle);
+    setForm({
+      ...vehicle,
+      acquisitionCost: vehicle.acquisitionCost ? Math.round(vehicle.acquisitionCost * 83) : ''
+    });
     setIsEditOpen(true);
   };
 
@@ -92,7 +95,10 @@ export default function Vehicles() {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
-      await vehicleService.create(form);
+      await vehicleService.create({
+        ...form,
+        acquisitionCost: Number(form.acquisitionCost) / 83 // convert user input INR to database USD
+      });
       addNotification('Asset Added', `Vehicle ${form.registrationNumber} has been successfully registered.`, 'success');
       setIsAddOpen(false);
       loadVehicles();
@@ -104,7 +110,10 @@ export default function Vehicles() {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
-      await vehicleService.update(form);
+      await vehicleService.update({
+        ...form,
+        acquisitionCost: Number(form.acquisitionCost) / 83 // convert user input INR to database USD
+      });
       addNotification('Asset Updated', `Vehicle ${form.registrationNumber} details have been updated.`, 'success');
       setIsEditOpen(false);
       loadVehicles();
@@ -376,10 +385,10 @@ export default function Vehicles() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Acquisition Cost ($)"
+              label="Acquisition Cost (₹)"
               type="number"
               required
-              placeholder="125000"
+              placeholder="1000000"
               value={form.acquisitionCost}
               onChange={(e) => setForm({ ...form, acquisitionCost: e.target.value })}
             />
@@ -467,10 +476,10 @@ export default function Vehicles() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Acquisition Cost ($)"
+              label="Acquisition Cost (₹)"
               type="number"
               required
-              placeholder="125000"
+              placeholder="1000000"
               value={form.acquisitionCost}
               onChange={(e) => setForm({ ...form, acquisitionCost: e.target.value })}
             />

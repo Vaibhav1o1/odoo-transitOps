@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Truck, Map, ShieldCheck, DollarSign, BarChart3, Wrench, ArrowRight } from 'lucide-react';
+import { Truck, Map, ShieldCheck, IndianRupee, BarChart3, Wrench, ArrowRight } from 'lucide-react';
 import { Button } from '../components/CommonUI';
 
 export default function Landing() {
@@ -27,7 +27,7 @@ export default function Landing() {
   const features = [
     { title: 'Fleet Tracking', description: 'Monitor registration numbers, statuses (Available, On Trip, In Shop), and locations in real-time.', icon: Truck, color: 'text-blue-600 bg-blue-500/10' },
     { title: 'Smart Trip Timeline', description: 'Track dispatches from Draft to Dispatched, Completed, and Cancelled with a visual stepping log.', icon: Map, color: 'text-teal-650 bg-teal-500/10' },
-    { title: 'Fuel & Expense Audit', description: 'Automate tracking for fuel, tolls, and maintenance with interactive expense breakdown analytics.', icon: DollarSign, color: 'text-amber-600 bg-amber-500/10' },
+    { title: 'Fuel & Expense Audit', description: 'Automate tracking for fuel, tolls, and maintenance with interactive expense breakdown analytics.', icon: IndianRupee, color: 'text-amber-600 bg-amber-500/10' },
     { title: 'Intelligent Maintenance', description: 'Assign tickets, set criticalities, and trace repairs to minimize downtime and shop costs.', icon: Wrench, color: 'text-rose-650 bg-rose-500/10' },
   ];
 

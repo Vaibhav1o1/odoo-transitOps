@@ -146,16 +146,18 @@ export const maintenanceService = {
       id: m.id,
       vehicleId: m.vehicle_id,
       description: m.description,
+      issue: m.description,
       cost: m.cost,
       assignedDate: m.date,
-      status: m.status
+      status: m.status,
+      priority: m.priority || 'Medium'
     }));
   },
 
   create: async (log) => {
     const res = await api.post('/maintenance', {
       vehicle_id: log.vehicleId,
-      description: log.description,
+      description: log.issue || log.description || '',
       cost: Number(log.cost || 0),
       date: new Date().toISOString().split('T')[0]
     });

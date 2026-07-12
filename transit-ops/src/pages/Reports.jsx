@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Download, FileText, TrendingUp, DollarSign, Fuel, Activity } from 'lucide-react';
+import { BarChart3, Download, FileText, TrendingUp, IndianRupee, Fuel, Activity } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Card, Button, StatCard, Badge } from '../components/CommonUI';
 import { useNotifications } from '../context/NotificationContext';
@@ -29,10 +29,10 @@ const efficiencyData = [
 ];
 
 const expenseShare = [
-  { name: 'Fuel', value: 5800, color: '#2563EB' },
-  { name: 'Maintenance', value: 3100, color: '#EF4444' },
-  { name: 'Toll', value: 1200, color: '#14B8A6' },
-  { name: 'Others', value: 850, color: '#F59E0B' },
+  { name: 'Fuel', value: 481400, color: '#2563EB' },
+  { name: 'Maintenance', value: 257300, color: '#EF4444' },
+  { name: 'Toll', value: 99600, color: '#14B8A6' },
+  { name: 'Others', value: 70550, color: '#F59E0B' },
 ];
 
 export default function Reports() {
@@ -87,7 +87,7 @@ export default function Reports() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard title="Fleet ROI Index" value="18.4%" trend="up" percent={2.3} icon={TrendingUp} color="blue" />
         <StatCard title="Fuel Efficiency" value="4.2 km/L" trend="up" percent={0.8} icon={Fuel} color="teal" />
-        <StatCard title="Operational Cost" value="$14,250" trend="down" percent={5.4} icon={DollarSign} color="red" />
+        <StatCard title="Operational Cost" value="₹11,82,750" trend="down" percent={5.4} icon={IndianRupee} color="red" />
         <StatCard title="Active Utilization" value="84.5%" trend="up" percent={3.1} icon={Activity} color="orange" />
       </div>
 
@@ -146,7 +146,7 @@ export default function Reports() {
                       <Cell key={idx} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(value) => ['₹' + value.toLocaleString('en-IN'), 'Cost']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -157,7 +157,7 @@ export default function Reports() {
                     <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: item.color }} />
                     <span className="text-slate-655 dark:text-slate-350">{item.name}</span>
                   </div>
-                  <span className="font-bold text-slate-950 dark:text-slate-50">${item.value.toLocaleString()}</span>
+                  <span className="font-bold text-slate-950 dark:text-slate-50">₹{item.value.toLocaleString('en-IN')}</span>
                 </div>
               ))}
             </div>

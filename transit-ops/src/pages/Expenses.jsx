@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Plus, Search, Calendar, Landmark, Wrench, Fuel } from 'lucide-react';
+import { IndianRupee, Plus, Search, Calendar, Landmark, Wrench, Fuel } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { expenseService, vehicleService } from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
@@ -9,9 +9,9 @@ import { Modal } from '../components/Modal';
 
 // Mock charts data
 const expenseTrendData = [
-  { name: 'May', total: 6800 },
-  { name: 'Jun', total: 8200 },
-  { name: 'Jul', total: 7850 },
+  { name: 'May', total: 564400 },
+  { name: 'Jun', total: 680600 },
+  { name: 'Jul', total: 651550 },
 ];
 
 export default function Expenses() {
@@ -70,8 +70,11 @@ export default function Expenses() {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
-      await expenseService.create(form);
-      addNotification('Expense Logged', `Logged ${form.expenseType} expense of $${form.cost}.`, 'success');
+      await expenseService.create({
+        ...form,
+        cost: Number(form.cost) / 83 // convert user input INR to database USD
+      });
+      addNotification('Expense Logged', `Logged ${form.expenseType} expense of ₹${Number(form.cost).toLocaleString('en-IN')}.`, 'success');
       setIsAddOpen(false);
       loadData();
     } catch (err) {
@@ -81,16 +84,16 @@ export default function Expenses() {
 
   // Calculations for charts
   const monthlyFuelCost = [
-    { month: 'May', Fuel: expenses.filter(e => e.expenseType === 'Fuel' && e.date.includes('05')).reduce((a,c)=>a+c.cost, 0) || 1200 },
-    { month: 'Jun', Fuel: expenses.filter(e => e.expenseType === 'Fuel' && e.date.includes('06')).reduce((a,c)=>a+c.cost, 0) || 1800 },
-    { month: 'Jul', Fuel: expenses.filter(e => e.expenseType === 'Fuel' && e.date.includes('07')).reduce((a,c)=>a+c.cost, 0) || 1455 },
+    { month: 'May', Fuel: (expenses.filter(e => e.expenseType === 'Fuel' && e.date.includes('05')).reduce((a,c)=>a+c.cost, 0) || 1200) * 83 },
+    { month: 'Jun', Fuel: (expenses.filter(e => e.expenseType === 'Fuel' && e.date.includes('06')).reduce((a,c)=>a+c.cost, 0) || 1800) * 83 },
+    { month: 'Jul', Fuel: (expenses.filter(e => e.expenseType === 'Fuel' && e.date.includes('07')).reduce((a,c)=>a+c.cost, 0) || 1455) * 83 },
   ];
 
   const distribution = [
-    { name: 'Fuel', value: expenses.filter(e => e.expenseType === 'Fuel').reduce((a,c)=>a+c.cost, 0) || 1 },
-    { name: 'Maintenance', value: expenses.filter(e => e.expenseType === 'Maintenance').reduce((a,c)=>a+c.cost, 0) || 1 },
-    { name: 'Toll', value: expenses.filter(e => e.expenseType === 'Toll').reduce((a,c)=>a+c.cost, 0) || 1 },
-    { name: 'Other', value: expenses.filter(e => e.expenseType === 'Other').reduce((a,c)=>a+c.cost, 0) || 1 },
+    { name: 'Fuel', value: (expenses.filter(e => e.expenseType === 'Fuel').reduce((a,c)=>a+c.cost, 0) || 1) * 83 },
+    { name: 'Maintenance', value: (expenses.filter(e => e.expenseType === 'Maintenance').reduce((a,c)=>a+c.cost, 0) || 1) * 83 },
+    { name: 'Toll', value: (expenses.filter(e => e.expenseType === 'Toll').reduce((a,c)=>a+c.cost, 0) || 1) * 83 },
+    { name: 'Other', value: (expenses.filter(e => e.expenseType === 'Other').reduce((a,c)=>a+c.cost, 0) || 1) * 83 },
   ];
 
   const PIE_COLORS = ['#2563EB', '#EF4444', '#14B8A6', '#F59E0B'];
@@ -111,7 +114,7 @@ export default function Expenses() {
     Fuel: <Fuel className="w-4 h-4 text-blue-500" />,
     Maintenance: <Wrench className="w-4 h-4 text-rose-500" />,
     Toll: <Landmark className="w-4 h-4 text-teal-500" />,
-    Other: <DollarSign className="w-4 h-4 text-amber-500" />,
+    Other: <IndianRupee className="w-4 h-4 text-amber-500" />,
   };
 
   const columns = [
@@ -138,7 +141,7 @@ export default function Expenses() {
       key: 'cost',
       render: (row) => (
         <span className="font-bold text-slate-900 dark:text-slate-50">
-          ${row.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ₹{(row.cost * 83).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       ),
     },
@@ -167,13 +170,13 @@ export default function Expenses() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Monthly Fuel Cost */}
         <Card className="p-4 text-xs">
-          <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3 text-left">Fuel Spend Trends ($)</h4>
+          <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3 text-left">Fuel Spend Trends (₹)</h4>
           <div className="h-48 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyFuelCost} margin={{ left: -20 }}>
                 <XAxis dataKey="month" stroke="#94A3B8" />
-                <YAxis stroke="#94A3B8" />
-                <Tooltip />
+                <YAxis stroke="#94A3B8" tickFormatter={(val) => '₹' + (val / 1000) + 'k'} />
+                <Tooltip formatter={(value) => ['₹' + value.toLocaleString('en-IN'), 'Fuel Cost']} />
                 <Bar dataKey="Fuel" fill="#2563EB" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -192,7 +195,7 @@ export default function Expenses() {
                       <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(value) => ['₹' + value.toLocaleString('en-IN'), 'Cost']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -209,14 +212,14 @@ export default function Expenses() {
 
         {/* Total Expense Trend */}
         <Card className="p-4 text-xs">
-          <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3 text-left">Total Operating Trend ($)</h4>
+          <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3 text-left">Total Operating Trend (₹)</h4>
           <div className="h-48 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={expenseTrendData} margin={{ left: -25 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
                 <XAxis dataKey="name" stroke="#94A3B8" />
-                <YAxis stroke="#94A3B8" />
-                <Tooltip />
+                <YAxis stroke="#94A3B8" tickFormatter={(val) => '₹' + (val / 1000) + 'k'} />
+                <Tooltip formatter={(value) => ['₹' + value.toLocaleString('en-IN'), 'Cost']} />
                 <Line type="monotone" dataKey="total" stroke="#14B8A6" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -267,7 +270,7 @@ export default function Expenses() {
         loading={loading}
         emptyState={
           <div className="text-center py-12">
-            <DollarSign className="w-12 h-12 text-slate-350 mx-auto mb-3" />
+            <IndianRupee className="w-12 h-12 text-slate-350 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-350">No Expenses Logged</h3>
             <p className="text-xs text-slate-455 mt-1">Start auditing budgets. Click 'Log Expense' above.</p>
           </div>
@@ -310,11 +313,11 @@ export default function Expenses() {
               onChange={(e) => setForm({ ...form, expenseType: e.target.value })}
             />
             <Input
-              label="Total Cost ($)"
+              label="Total Cost (₹)"
               type="number"
-              step="0.01"
+              step="1"
               required
-              placeholder="150.00"
+              placeholder="12000"
               value={form.cost}
               onChange={(e) => setForm({ ...form, cost: Number(e.target.value) })}
             />
