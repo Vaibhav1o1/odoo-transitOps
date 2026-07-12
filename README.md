@@ -2,6 +2,16 @@
 
 # TransitOps — Fleet & Logistics Management ERP
 
+[![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![React Router](https://img.shields.io/badge/React_Router-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white)](https://reactrouter.com/)
+[![Recharts](https://img.shields.io/badge/Recharts-FF6384?style=for-the-badge)](https://recharts.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Lucide](https://img.shields.io/badge/Lucide-F56565?style=for-the-badge)](https://lucide.dev/)
+
 **TransitOps** is a lightweight, real-time fleet management and logistics ERP system built to digitize vehicle registry, driver allocation, dispatches, maintenance logging, and operational expenses. It enforces strict transactional integrity and business rule validations out of the box.
 
 [📖 Setup Guide](#-setup--installation) · [🐛 Report Bug](https://github.com/Vaibhav1o1/odoo-transitOps/issues)
