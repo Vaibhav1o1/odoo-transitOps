@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid'); // Required for UUID primary keys
-const db = require('./db');
+const db = require('./db/db');
 
 const app = express();
 app.use(cors());
