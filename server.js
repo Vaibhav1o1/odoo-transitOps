@@ -422,7 +422,7 @@ app.get('/api/analytics/vehicle-roi', (req, res) => {
 // ==========================================
 // START SERVER
 // ==========================================
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
     console.log(`🚀 TransitOps backend running on port ${PORT}`);
 });
