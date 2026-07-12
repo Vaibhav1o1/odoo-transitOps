@@ -223,7 +223,7 @@ npm run dev
 |------|--------|
 | **Vaibhav Gupta** | [Vaibhav1o1](https://github.com/Vaibhav1o1) |
 | **Raghib Aftab** | [raghib-aftab](https://github.com/raghib-aftab) |
-| **Shaurya Jain** | [shauryajain312](https://github.com/shauryajain111) |
+| **Shaurya Jain** | [shauryajain111](https://github.com/shauryajain111) |
 | **Hemant Nishad** | [hemant-code01](https://github.com/hemant-code01) |
 
 ---
