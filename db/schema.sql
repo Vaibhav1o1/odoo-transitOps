@@ -23,9 +23,14 @@ CREATE TABLE IF NOT EXISTS vehicles (
 -- 3. Drivers
 CREATE TABLE IF NOT EXISTS drivers (
     id TEXT PRIMARY KEY, -- UUID
-    user_id TEXT NOT NULL,
+    user_id TEXT, -- Nullable because server.js does not currently supply user_id on registration
     name TEXT NOT NULL,
     license_number TEXT NOT NULL,
+    license_category TEXT NOT NULL,
+    license_expiry_date TEXT NOT NULL,
+    contact_number TEXT NOT NULL,
+    safety_score REAL NOT NULL DEFAULT 100.0,
+    status TEXT NOT NULL DEFAULT 'Available' CHECK(status IN ('Available', 'On Trip', 'Suspended')),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -37,6 +42,7 @@ CREATE TABLE IF NOT EXISTS trips (
     source TEXT NOT NULL,
     destination TEXT NOT NULL,
     cargo_weight_kg REAL NOT NULL,
+    planned_distance_km REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'Draft' CHECK(status IN ('Draft', 'Dispatched', 'Completed', 'Cancelled')),
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
     FOREIGN KEY (driver_id) REFERENCES drivers(id)
@@ -47,16 +53,18 @@ CREATE TABLE IF NOT EXISTS maintenance_logs (
     id TEXT PRIMARY KEY, -- UUID
     vehicle_id TEXT NOT NULL,
     description TEXT NOT NULL,
+    cost REAL NOT NULL DEFAULT 0.0,
+    date TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'Open' CHECK(status IN ('Open', 'Closed')),
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
 );
 
--- 6. Fuel & Expenses
-CREATE TABLE IF NOT EXISTS fuel_expenses (
+-- 6. Fuel Logs
+CREATE TABLE IF NOT EXISTS fuel_logs (
     id TEXT PRIMARY KEY, -- UUID
     vehicle_id TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('Fuel', 'Toll', 'Maintenance')),
-    amount_cost REAL NOT NULL,
-    liters REAL, -- Nullable
+    liters REAL NOT NULL,
+    cost REAL NOT NULL,
+    date TEXT NOT NULL,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
 );
