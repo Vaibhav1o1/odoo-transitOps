@@ -1,6 +1,13 @@
 -- Enable foreign key support in SQLite
 PRAGMA foreign_keys = ON;
 
+DROP TABLE IF EXISTS fuel_logs;
+DROP TABLE IF EXISTS maintenance_logs;
+DROP TABLE IF EXISTS trips;
+DROP TABLE IF EXISTS drivers;
+DROP TABLE IF EXISTS vehicles;
+DROP TABLE IF EXISTS users;
+
 -- 1. Users
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY, -- UUID
@@ -55,7 +62,7 @@ CREATE TABLE IF NOT EXISTS maintenance_logs (
     description TEXT NOT NULL,
     cost REAL NOT NULL DEFAULT 0.0,
     date TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'Open' CHECK(status IN ('Open', 'Closed')),
+    status TEXT NOT NULL DEFAULT 'Open' CHECK(status IN ('Open', 'In Progress', 'Closed')),
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
 );
 

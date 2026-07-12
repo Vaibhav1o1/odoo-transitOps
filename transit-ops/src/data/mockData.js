@@ -51,7 +51,7 @@ export const initialExpenses = [
 export const initialNotifications = [
   { id: 'N-1', title: 'Vehicle maintenance updated', message: 'Freightliner Cascadia (TX-4829) is now set to On Trip.', time: '10 mins ago', type: 'info', read: false },
   { id: 'N-2', title: 'Trip T-1002 Completed', message: 'Driver Carlos Santana successfully delivered cargo weight of 2.8t to Seattle.', time: '2 hours ago', type: 'success', read: false },
-  { id: 'N-3', title: 'Fuel Logged', message: 'Mercedes-Benz Sprinter (FL-3012) fuel cost of $85.00 logged successfully.', time: '5 hours ago', type: 'info', read: true },
-  { id: 'N-4', title: 'Expense Approved', message: '$1,250.00 maintenance invoice for Volvo FH16 has been approved.', time: '1 day ago', type: 'success', read: true },
+  { id: 'N-3', title: 'Fuel Logged', message: 'Mercedes-Benz Sprinter (FL-3012) fuel cost of ₹7,055 logged successfully.', time: '5 hours ago', type: 'info', read: true },
+  { id: 'N-4', title: 'Expense Approved', message: '₹1,03,750 maintenance invoice for Volvo FH16 has been approved.', time: '1 day ago', type: 'success', read: true },
   { id: 'N-5', title: 'Driver License Expiring', message: 'Carlos Santana (Class C) license expires on 2026-07-28 (16 days).', time: '2 days ago', type: 'warning', read: false },
 ];

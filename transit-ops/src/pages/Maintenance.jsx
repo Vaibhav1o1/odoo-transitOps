@@ -74,7 +74,8 @@ export default function Maintenance() {
 
   const handleStatusTransition = async (ticketId, nextStatus, cost = undefined) => {
     try {
-      await maintenanceService.updateStatus(ticketId, nextStatus, cost);
+      const apiCost = cost !== undefined ? Number(cost) / 83 : undefined;
+      await maintenanceService.updateStatus(ticketId, nextStatus, apiCost);
       
       // If closing, set vehicle back to Available
       if (nextStatus === 'Closed') {
@@ -137,7 +138,7 @@ export default function Maintenance() {
         </div>
         {ticket.status === 'Closed' && ticket.cost && (
           <div className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 rounded-lg px-2 py-0.5 inline-block">
-            Cost: ${ticket.cost.toFixed(2)}
+            Cost: ₹{(ticket.cost * 83).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         )}
       </div>
@@ -318,10 +319,10 @@ export default function Maintenance() {
                     Input total cost of parts and shop labor to close out this ticket.
                   </p>
                   <Input
-                    label="Final Invoice Cost ($)"
+                    label="Final Invoice Cost (₹)"
                     type="number"
                     required
-                    placeholder="450.00"
+                    placeholder="35000"
                     value={costForm}
                     onChange={(e) => setCostForm(e.target.value)}
                   />
@@ -341,7 +342,7 @@ export default function Maintenance() {
                 <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 p-4 rounded-xl border border-emerald-500/25 flex items-center space-x-2">
                   <CheckCircle className="w-5 h-5 flex-shrink-0" />
                   <span className="text-xs font-bold leading-normal">
-                    This ticket has been completed and archived with invoice total: ${selectedTicket.cost?.toFixed(2)}.
+                    This ticket has been completed and archived with invoice total: ₹{(selectedTicket.cost * 83).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
                   </span>
                 </div>
               )}

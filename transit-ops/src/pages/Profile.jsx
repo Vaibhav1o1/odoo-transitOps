@@ -30,7 +30,7 @@ export default function Profile() {
   // Mock recent activities
   const recentActivities = [
     { title: 'Authorized Dispatch T-1005', desc: 'Dispatched Ford Transit from Houston, TX to Chicago, IL', time: '10 mins ago' },
-    { title: 'Logged Fuel Expense', desc: 'Logged $85.00 fuel invoice for CA-8891 Sprinter Van', time: '5 hours ago' },
+    { title: 'Logged Fuel Expense', desc: 'Logged ₹7,055.00 fuel invoice for CA-8891 Sprinter Van', time: '5 hours ago' },
     { title: 'Approved Radiator Maintenance', desc: 'Approved Volvo FH16 radiator shop diagnostic invoice', time: '1 day ago' },
   ];
 

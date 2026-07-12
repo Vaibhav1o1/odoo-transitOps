@@ -80,14 +80,15 @@ const tripCompletionData = [
 ];
 
 const CITY_COORDS = {
-  'Delhi': { x: 145, y: 70, label: 'Delhi (DEL)' },
-  'Mumbai': { x: 95, y: 175, label: 'Mumbai (BOM)' },
-  'Bengaluru': { x: 135, y: 240, label: 'Bengaluru (BLR)' },
-  'Chennai': { x: 165, y: 235, label: 'Chennai (MAA)' },
-  'Kolkata': { x: 250, y: 130, label: 'Kolkata (CCU)' },
-  'Hyderabad': { x: 150, y: 185, label: 'Hyderabad (HYD)' },
-  'Ahmedabad': { x: 85, y: 135, label: 'Ahmedabad (AMD)' },
-  'Pune': { x: 100, y: 190, label: 'Pune (PNQ)' }
+  'Delhi': { x: 50, y: 50, label: 'Delhi (DEL)' },
+  'Mumbai': { x: 60, y: 180, label: 'Mumbai (BOM)' },
+  'Bengaluru': { x: 130, y: 220, label: 'Bengaluru (BLR)' },
+  'Chennai': { x: 210, y: 230, label: 'Chennai (MAA)' },
+  'Kolkata': { x: 270, y: 160, label: 'Kolkata (CCU)' },
+  'Hyderabad': { x: 170, y: 150, label: 'Hyderabad (HYD)' },
+  'Ahmedabad': { x: 40, y: 110, label: 'Ahmedabad (AMD)' },
+  'Pune': { x: 100, y: 140, label: 'Pune (PNQ)' },
+  'Samastipur': { x: 220, y: 70, label: 'Samastipur (SPJ)' }
 };
 
 const getCoords = (cityName, defaultCity = 'Delhi') => {
@@ -108,6 +109,90 @@ const getCoords = (cityName, defaultCity = 'Delhi') => {
   const sum = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const keys = Object.keys(CITY_COORDS);
   return CITY_COORDS[keys[sum % keys.length]];
+};
+
+const HIGHWAY_SEGMENTS_DETAILED = {
+  'Delhi-Ahmedabad': [
+    { x: 50, y: 50 },
+    { x: 42, y: 70 },
+    { x: 52, y: 90 },
+    { x: 40, y: 110 }
+  ],
+  'Ahmedabad-Mumbai': [
+    { x: 40, y: 110 },
+    { x: 55, y: 130 },
+    { x: 45, y: 155 },
+    { x: 60, y: 180 }
+  ],
+  'Mumbai-Pune': [
+    { x: 60, y: 180 },
+    { x: 75, y: 165 },
+    { x: 88, y: 155 },
+    { x: 100, y: 140 }
+  ],
+  'Pune-Hyderabad': [
+    { x: 100, y: 140 },
+    { x: 120, y: 160 },
+    { x: 145, y: 135 },
+    { x: 170, y: 150 }
+  ],
+  'Hyderabad-Bengaluru': [
+    { x: 170, y: 150 },
+    { x: 140, y: 175 },
+    { x: 160, y: 200 },
+    { x: 130, y: 220 }
+  ],
+  'Bengaluru-Chennai': [
+    { x: 130, y: 220 },
+    { x: 160, y: 210 },
+    { x: 185, y: 235 },
+    { x: 210, y: 230 }
+  ],
+  'Chennai-Kolkata': [
+    { x: 210, y: 230 },
+    { x: 250, y: 210 },
+    { x: 230, y: 180 },
+    { x: 270, y: 160 }
+  ],
+  'Kolkata-Samastipur': [
+    { x: 270, y: 160 },
+    { x: 240, y: 140 },
+    { x: 255, y: 105 },
+    { x: 220, y: 70 }
+  ],
+  'Samastipur-Delhi': [
+    { x: 220, y: 70 },
+    { x: 180, y: 80 },
+    { x: 110, y: 60 },
+    { x: 50, y: 50 }
+  ],
+  'Hyderabad-Samastipur': [
+    { x: 170, y: 150 },
+    { x: 195, y: 120 },
+    { x: 210, y: 95 },
+    { x: 220, y: 70 }
+  ]
+};
+
+const getSegmentPoints = (src, dest) => {
+  const key1 = `${src}-${dest}`;
+  const key2 = `${dest}-${src}`;
+  if (HIGHWAY_SEGMENTS_DETAILED[key1]) {
+    return HIGHWAY_SEGMENTS_DETAILED[key1];
+  } else if (HIGHWAY_SEGMENTS_DETAILED[key2]) {
+    return [...HIGHWAY_SEGMENTS_DETAILED[key2]].reverse();
+  }
+  // fallback if cities are not defined in corridors map
+  const p1 = CITY_COORDS[src] || CITY_COORDS['Delhi'];
+  const p2 = CITY_COORDS[dest] || CITY_COORDS['Delhi'];
+  return [p1, p1, p2, p2];
+};
+
+const getCubicBezierPoint = (p0, p1, p2, p3, t) => {
+  const mt = 1 - t;
+  const x = mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x;
+  const y = mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y;
+  return { x, y };
 };
 
 const getProgress = (vehicleId) => {
@@ -338,14 +423,28 @@ export default function Dashboard() {
   ].filter(i => i.value > 0) : [];
 
   // Live Map calculations
-  const mapVehicles = (allVehicles.length > 0 ? allVehicles : [
+  const baseMocks = [
     { id: 'v1', registrationNumber: 'DL-01-GB-4202', name: 'Tata Prima', type: 'Semi-Truck', status: 'On Trip' },
     { id: 'v2', registrationNumber: 'MH-12-PQ-8819', name: 'Mahindra Blazo', type: 'Heavy Duty Truck', status: 'On Trip' },
     { id: 'v3', registrationNumber: 'KA-03-HA-3312', name: 'Ashok Leyland Ecomet', type: 'Box Truck', status: 'Available' },
     { id: 'v4', registrationNumber: 'TS-09-XY-9092', name: 'BharatBenz 2823C', type: 'Dump Truck', status: 'In Shop' },
     { id: 'v5', registrationNumber: 'WB-02-TR-4567', name: 'Tata LPT 1613', type: 'Box Truck', status: 'Available' },
-    { id: 'v6', registrationNumber: 'DL-02-CD-7890', name: 'Eicher Pro 2049', type: 'Cargo Van', status: 'In Shop' }
-  ]).map(v => {
+    { id: 'v6', registrationNumber: 'DL-02-CD-7890', name: 'Eicher Pro 2049', type: 'Cargo Van', status: 'In Shop' },
+    { id: 'v7', registrationNumber: 'HR-55-XY-1234', name: 'Tata Ultra', type: 'Box Truck', status: 'On Trip' },
+    { id: 'v8', registrationNumber: 'UP-16-AT-9988', name: 'Mahindra Furio', type: 'Cargo Van', status: 'On Trip' },
+    { id: 'v9', registrationNumber: 'KA-51-MB-5678', name: 'Ashok Leyland Partner', type: 'Cargo Van', status: 'Available' },
+    { id: 'v10', registrationNumber: 'GJ-01-ZZ-1122', name: 'BharatBenz 1917R', type: 'Heavy Duty Truck', status: 'Available' },
+  ];
+
+  // Merge database vehicles with mocks to ensure at least 10 exist
+  const combinedVehicles = [...allVehicles];
+  baseMocks.forEach(mock => {
+    if (!combinedVehicles.some(v => v.registrationNumber === mock.registrationNumber)) {
+      combinedVehicles.push(mock);
+    }
+  });
+
+  const mapVehicles = combinedVehicles.map(v => {
     const activeTrip = allTrips.find(t => t.vehicleId === v.id && t.status === 'Dispatched');
     let route = activeTrip ? `${activeTrip.source} ➔ ${activeTrip.destination}` : null;
     let driverName = 'No Driver Assigned';
@@ -353,8 +452,11 @@ export default function Dashboard() {
       const drv = driversList.find(d => d.id === activeTrip.driverId);
       driverName = drv ? drv.name : 'Amit Sharma';
     } else if (v.status === 'On Trip') {
-      route = v.id === 'v1' ? 'Delhi ➔ Mumbai' : 'Mumbai ➔ Bengaluru';
-      driverName = v.id === 'v1' ? 'Amit Sharma' : 'Rajesh Patil';
+      if (v.id === 'v1') { route = 'Delhi ➔ Mumbai'; driverName = 'Amit Sharma'; }
+      else if (v.id === 'v2') { route = 'Mumbai ➔ Bengaluru'; driverName = 'Rajesh Patil'; }
+      else if (v.id === 'v7') { route = 'Delhi ➔ Samastipur'; driverName = 'Sanjay Gupta'; }
+      else if (v.id === 'v8') { route = 'Samastipur ➔ Kolkata'; driverName = 'Karthik Raja'; }
+      else { route = 'Delhi ➔ Mumbai'; driverName = 'Amit Sharma'; }
     }
     return {
       ...v,
@@ -372,16 +474,16 @@ export default function Dashboard() {
       const parts = vehicle.route.split('➔');
       const src = parts[0]?.trim();
       const dest = parts[1]?.trim();
-      const p1 = getCoords(src);
-      const p2 = getCoords(dest);
       progress = getProgress(vehicle.id);
       
       const timeFactor = simTime / 500;
       const wiggleX = Math.sin(timeFactor + vehicle.registrationNumber.charCodeAt(0)) * 0.5;
       const wiggleY = Math.cos(timeFactor + vehicle.registrationNumber.charCodeAt(1 || 0)) * 0.5;
       
-      x = p1.x + (p2.x - p1.x) * progress + wiggleX;
-      y = p1.y + (p2.y - p1.y) * progress + wiggleY;
+      const pts = getSegmentPoints(src, dest);
+      const bPt = getCubicBezierPoint(pts[0], pts[1], pts[2], pts[3], progress);
+      x = bPt.x + wiggleX;
+      y = bPt.y + wiggleY;
     } else if (vehicle.status === 'In Shop') {
       const repairCities = ['Pune', 'Ahmedabad', 'Hyderabad'];
       const hashIdx = vehicle.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % repairCities.length;
@@ -553,35 +655,49 @@ export default function Dashboard() {
               </div>
 
               {/* Map SVG Canvas */}
-              <svg viewBox="0 0 320 256" className="w-full h-full bg-slate-950 rounded-xl border border-slate-800 relative overflow-hidden select-none">
+              <svg viewBox="0 0 320 256" className="w-full h-full bg-[#f4f3f0] rounded-xl border border-slate-200 dark:border-slate-200 relative overflow-hidden select-none shadow-inner">
                 <style>{`
                   @keyframes dash {
                     to {
                       stroke-dashoffset: -20;
                     }
                   }
-                  .route-path {
-                    stroke: rgba(71, 85, 105, 0.25);
-                    stroke-width: 1.5;
+                  .route-path-bg {
+                    stroke: #e0a000;
+                    stroke-width: 3.8;
                     fill: none;
+                    stroke-linecap: round;
+                    stroke-linejoin: round;
+                    opacity: 0.85;
+                  }
+                  .route-path-core {
+                    stroke: #ffe082;
+                    stroke-width: 1.8;
+                    fill: none;
+                    stroke-linecap: round;
+                    stroke-linejoin: round;
                   }
                   .route-active-line {
-                    stroke: #0ea5e9;
-                    stroke-width: 1.5;
-                    stroke-dasharray: 4, 6;
+                    stroke: #4285f4;
+                    stroke-width: 2.2;
+                    stroke-dasharray: 4, 4;
                     animation: dash 6s linear infinite;
                     fill: none;
-                    opacity: 0.65;
+                    opacity: 0.95;
                   }
                   .city-dot {
-                    fill: #334155;
-                    stroke: #0f172a;
-                    stroke-width: 1;
+                    fill: #1e293b;
+                    stroke: #ffffff;
+                    stroke-width: 1.5;
                   }
                   .city-label {
-                    font-size: 6.5px;
-                    font-weight: 700;
-                    fill: #64748b;
+                    font-size: 6px;
+                    font-weight: 850;
+                    fill: #0f172a;
+                    paint-order: stroke;
+                    stroke: #ffffff;
+                    stroke-width: 2px;
+                    stroke-linejoin: round;
                   }
                   .pulse-ring {
                     animation: map-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -591,48 +707,66 @@ export default function Dashboard() {
                     50% { transform: scale(1.6); opacity: 0; }
                   }
                 `}</style>
-                
-                {/* Background Grid Gridlines */}
-                <defs>
-                  <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
-                    <path d="M 16 0 L 0 0 0 16" fill="none" stroke="#090d16" strokeWidth="0.5" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
 
-                {/* Shipping Corridors */}
-                <path d="M 145 70 L 85 135 L 95 175" className="route-path" />
-                <path d="M 95 175 L 100 190 L 135 240" className="route-path" />
-                <path d="M 135 240 L 165 235" className="route-path" />
-                <path d="M 150 185 L 165 235" className="route-path" />
-                <path d="M 95 175 L 150 185" className="route-path" />
-                <path d="M 145 70 L 250 130" className="route-path" />
-                <path d="M 250 130 L 165 235" className="route-path" />
+                {/* Highlighted Winding River (Google Maps Styled Water) */}
+                <path d="M -10 100 Q 80 80 120 140 T 250 180 T 330 260" fill="none" stroke="#bae6fd" strokeWidth="12" strokeLinecap="round" opacity="0.65" />
+                <path d="M -10 100 Q 80 80 120 140 T 250 180 T 330 260" fill="none" stroke="#c4dcfc" strokeWidth="6" strokeLinecap="round" opacity="0.95" />
+
+                {/* Background Minor Roads (Touch of Google Maps) */}
+                {[
+                  { p1: { x: 10, y: 30 }, p2: { x: 300, y: 40 }, ctrl: { x: 150, y: 80 } },
+                  { p1: { x: 20, y: 150 }, p2: { x: 280, y: 220 }, ctrl: { x: 150, y: 120 } },
+                  { p1: { x: 110, y: 10 }, p2: { x: 120, y: 250 }, ctrl: { x: 80, y: 120 } },
+                  { p1: { x: 250, y: 20 }, p2: { x: 240, y: 240 }, ctrl: { x: 290, y: 130 } }
+                ].map((road, idx) => (
+                  <g key={`minor-${idx}`} opacity="0.75">
+                    <path d={`M ${road.p1.x} ${road.p1.y} Q ${road.ctrl.x} ${road.ctrl.y} ${road.p2.x} ${road.p2.y}`} stroke="#e4e4e4" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                    <path d={`M ${road.p1.x} ${road.p1.y} Q ${road.ctrl.x} ${road.ctrl.y} ${road.p2.x} ${road.p2.y}`} stroke="#ffffff" strokeWidth="1" fill="none" strokeLinecap="round" />
+                  </g>
+                ))}
+
+                {/* Shipping Corridors - Roadways Casing (Curved Highways) */}
+                {Object.entries(HIGHWAY_SEGMENTS_DETAILED).map(([key, pts], idx) => {
+                  return (
+                    <path key={`hbg-${idx}`} d={`M ${pts[0].x} ${pts[0].y} C ${pts[1].x} ${pts[1].y}, ${pts[2].x} ${pts[2].y}, ${pts[3].x} ${pts[3].y}`} className="route-path-bg" />
+                  );
+                })}
+
+                {/* Shipping Corridors - Roadways Core (Curved Highways) */}
+                {Object.entries(HIGHWAY_SEGMENTS_DETAILED).map(([key, pts], idx) => {
+                  return (
+                    <path key={`hcore-${idx}`} d={`M ${pts[0].x} ${pts[0].y} C ${pts[1].x} ${pts[1].y}, ${pts[2].x} ${pts[2].y}, ${pts[3].x} ${pts[3].y}`} className="route-path-core" />
+                  );
+                })}
 
                 {/* Active Dispatches Paths */}
                 {renderedVehicles.filter(v => v.status === 'On Trip' && v.route).map(vehicle => {
                   const parts = vehicle.route.split('➔');
-                  const p1 = getCoords(parts[0]?.trim());
-                  const p2 = getCoords(parts[1]?.trim());
+                  const src = parts[0]?.trim();
+                  const dest = parts[1]?.trim();
+                  const pts = getSegmentPoints(src, dest);
                   return (
-                    <path key={`line-${vehicle.id}`} d={`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`} className="route-active-line" />
+                    <g key={`line-${vehicle.id}`}>
+                      <path d={`M ${pts[0].x} ${pts[0].y} C ${pts[1].x} ${pts[1].y}, ${pts[2].x} ${pts[2].y}, ${pts[3].x} ${pts[3].y}`} stroke="#174ea6" strokeWidth="4.2" fill="none" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
+                      <path d={`M ${pts[0].x} ${pts[0].y} C ${pts[1].x} ${pts[1].y}, ${pts[2].x} ${pts[2].y}, ${pts[3].x} ${pts[3].y}`} className="route-active-line" />
+                    </g>
                   );
                 })}
 
                 {/* City Nodes */}
                 {Object.entries(CITY_COORDS).map(([name, pt]) => (
                   <g key={name}>
-                    <circle cx={pt.x} cy={pt.y} r="2.5" className="city-dot" />
-                    <text x={pt.x + 4} y={pt.y + 1.5} className="city-label">{name}</text>
+                    <circle cx={pt.x} cy={pt.y} r="3.5" className="city-dot" />
+                    <text x={pt.x + 5} y={pt.y + 1.5} className="city-label">{name}</text>
                   </g>
                 ))}
 
-                {/* Vehicle Markers */}
+                {/* Vehicle Markers (Enlarged) */}
                 {renderedVehicles
                   .filter(v => !searchQuery || v.registrationNumber.toLowerCase().includes(searchQuery.toLowerCase()))
                   .map(v => {
                     const isSelected = selectedMapVehicle?.id === v.id;
-                    const markerColor = v.status === 'On Trip' ? '#3b82f6' : v.status === 'In Shop' ? '#ef4444' : '#22c55e';
+                    const markerColor = v.status === 'On Trip' ? '#2563eb' : v.status === 'In Shop' ? '#ef4444' : '#22c55e';
                     return (
                       <g
                         key={v.id}
@@ -641,12 +775,12 @@ export default function Dashboard() {
                         transform={`translate(${v.x}, ${v.y})`}
                       >
                         {v.status === 'On Trip' && (
-                          <circle r="6" fill={markerColor} className="pulse-ring" style={{ transformOrigin: '0px 0px' }} />
+                          <circle r="8" fill={markerColor} className="pulse-ring" style={{ transformOrigin: '0px 0px' }} />
                         )}
                         {isSelected && (
-                          <circle r="8" fill="none" stroke="#ffffff" strokeWidth="1.2" />
+                          <circle r="11" fill="none" stroke="#2563eb" strokeWidth="1.5" />
                         )}
-                        <circle r="3.5" fill={markerColor} stroke="#ffffff" strokeWidth="0.8" />
+                        <circle r="5" fill={markerColor} stroke="#ffffff" strokeWidth="1.2" />
                       </g>
                     );
                   })}
