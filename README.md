@@ -238,6 +238,12 @@ npm run dev
 
 ---
 
+## 🏆 Hackathon
+
+This project was built as part of an **Odoo Hackathon** submission.
+
+---
+
 <div align="center">
 
 **Built with ❤️ for smart logistics management**
